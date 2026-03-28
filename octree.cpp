@@ -51,6 +51,12 @@ struct OctreeNode {
     OctreeNode* children[8] = {nullptr}; // 8 child nodes (sub-cubes)
 
     OctreeNode(const BoundingBox& box) : boundary(box) {}
+
+    ~OctreeNode() {
+        for(int i=0; i<8; i++) {
+            delete children[i]; // safe even if nullptr
+        }
+    }
 };
 
 void subdivide(OctreeNode* node) {
@@ -98,8 +104,10 @@ void insert(OctreeNode* node, const Point& p) {
         // redistribute existing points into children
         for(const auto& oldPoint : node->points) {
             for(int i=0; i<8; i++) {
-                insert(node->children[i], oldPoint);
-                break;
+                if(node->children[i]->boundary.contains(oldPoint)) {
+                    insert(node->children[i], oldPoint);
+                    break;
+                }
             }
         }
         node->points.clear();
@@ -107,8 +115,10 @@ void insert(OctreeNode* node, const Point& p) {
 
     // insert new point into the correct child
     for(int i=0; i<8; i++) {
-        insert(node->children[i], p);
-        break;
+        if(node->children[i]->boundary.contains(p)) {
+            insert(node->children[i], p);
+            break;
+        }
     }
 }
 
@@ -125,8 +135,58 @@ void insert(OctreeNode* node, const Point& p) {
 // for n points, depth grows like O(log n) like a balanced BST
 // insertion cost = tree depth * constant redistrbution = O(log n)
 
+// deletion of point also has O(log n) time complexity
+bool removePoint(OctreeNode* node, const Point& p) {
+    // prune if point is outside the node
+    if(!node->boundary.contains(p)) return false;
+
+    // try to remove from this node's point
+    for(auto it = node->points.begin(); it != node->points.end(); ++it) {
+        // de-referencing from iterator, it gives Point object not points directly - shorthand for (*it).x
+        if(it->x == p.x && it->y == p.y && it->z == p.z) {
+            node->points.erase(it);
+            return true;
+        }
+    }
+
+    // recurse into children
+    // if a point is not inside a node's boundary, it cannot possibly be inside any of its children
+    // because children are strictly subdivisions of the parent's cube
+
+    // if the node has been subdivided and has children, loop through all
+    if(node->children[0] != nullptr) {
+        for(int i=0; i<8; i++) {
+            if(removePoint(node->children[i], p)) {
+                    // after successful deletion, try merging back
+                    bool allEmpty = true;
+                    for(int j=0; j<8; j++) {
+                        // are all of this node's children completely empty?
+                        // if child still has points or if child itself has been subdidivded further meaning 
+                        // it has grandchildren and is not empty
+                        if(node->children[j]->points.size() > 0 || node->children[j]->children[0] != nullptr) {
+                            allEmpty = false;
+                            break;
+                        }
+                    }
+                    // cleaning up the structure after the point has been removed
+                    if(allEmpty) {
+                        for(int j=0; j<8; j++) {
+                            delete node->children[j];
+                            node->children[j] = nullptr;
+                        }
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false; // not found
+}
+
 // querying or searching for points within a given region (range) - O(log n + k) where k is the number of points found
-void queryRange(OctreeNode* node, const BoundingBox& range, vector<Point>& results) {
+// usecases: collision detection, visibility checks, spatial filtering
+void queryRange(const OctreeNode* node, const BoundingBox& range, vector<Point>& results) {
     // if node's boundary doesn't intersect query range, skip
     if(!node->boundary.intersects(range)) return;
 
@@ -144,6 +204,29 @@ void queryRange(OctreeNode* node, const BoundingBox& range, vector<Point>& resul
         }
     }
 }
+
+// euclidean distance between two points
+float distance(const Point& a, const Point& b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    float dz = a.z - b.z;
+    return sqrt(dx*dx + dy*dy + dz*dz);
+}
+
+// euclidean distance from a query point to a bounding box
+// if a point is inside the box, distance is 0
+// if a point is outside, how far the point from the nearest face/edge/corner of the box
+float distanceToBox(const Point& p, const BoundingBox& box) {
+    float dx = 
+}
+
+// it also tells us whether a whole cube (subtree) could possibly contain a closer point
+// than the best one we've already found
+
+// querying or search the closest point(s) to a query point
+// usecases: compression, clustering, pathfinding, similarity search
+
+
 
 // driver code
 int main() {
@@ -169,6 +252,4 @@ int main() {
 }
 
 // to add:
-// deletion (remove point)
-// balancing/merging (collapse if they become empty)
 // nearest neighbor search (find closest point)
