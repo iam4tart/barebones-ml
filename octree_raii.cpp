@@ -61,15 +61,14 @@ struct BoundingBox {
 struct OctreeNode {
     BoundingBox boundary; // cube region
     vector<Point> points; // points/actual data stored inside the cube
-    OctreeNode* children[8] = {nullptr}; // 8 child nodes (sub-cubes)
+
+    // using smart pointers
+    // 8 child nodes (sub-cubes)
+    array<unique_ptr<OctreeNode>, 8> children; 
 
     OctreeNode(const BoundingBox& box) : boundary(box) {}
 
-    ~OctreeNode() {
-        for(int i=0; i<8; i++) {
-            delete children[i]; // safe even if nullptr
-        }
-    }
+    // no need for custom destructor - unique_ptr handles cleanup
 };
 
 void subdivide(OctreeNode* node) {
@@ -91,7 +90,7 @@ void subdivide(OctreeNode* node) {
 
     // assign children
     for(int i=0; i<8; i++) {
-        node->children[i] = new OctreeNode(boxes[i]);
+        node->children[i] = make_unique<OctreeNode>(boxes[i]);
     }
 }
 
@@ -118,7 +117,10 @@ void insert(OctreeNode* node, const Point& p) {
         for(const auto& oldPoint : node->points) {
             for(int i=0; i<8; i++) {
                 if(node->children[i]->boundary.contains(oldPoint)) {
-                    insert(node->children[i], oldPoint);
+                    // .get() comes from RAII where it gives you
+                    // raw pointer without transferring ownership
+                    // ownership stays with unique_ptr
+                    insert(node->children[i].get(), oldPoint);
                     break;
                 }
             }
@@ -129,7 +131,7 @@ void insert(OctreeNode* node, const Point& p) {
     // insert new point into the correct child
     for(int i=0; i<8; i++) {
         if(node->children[i]->boundary.contains(p)) {
-            insert(node->children[i], p);
+            insert(node->children[i].get(), p);
             break;
         }
     }
@@ -184,8 +186,7 @@ bool removePoint(OctreeNode* node, const Point& p) {
                     // cleaning up the structure after the point has been removed
                     if(allEmpty) {
                         for(int j=0; j<8; j++) {
-                            delete node->children[j];
-                            node->children[j] = nullptr;
+                            node->children[j].reset(); // safely deletes and sets nullptr
                         }
                     }
                     return true;
@@ -193,7 +194,7 @@ bool removePoint(OctreeNode* node, const Point& p) {
             }
         }
         return false; // not found
-    }
+}
 
 // querying or searching for points within a given region (range) - O(log n + k) where k is the number of points found
 // usecases: collision detection, visibility checks, spatial filtering
@@ -313,23 +314,49 @@ int main() {
     BoundingBox rootBox{0,10,0,10,0,10};
     OctreeNode root(rootBox);
 
+    cout << "=== Insertion ===\n";
     insert(&root, Point{1,1,1});
     insert(&root, Point{9,9,9});
     insert(&root, Point{5,5,5});
+    insert(&root, Point{2,8,3});
+    insert(&root, Point{7,2,6});
+    cout << "Inserted 5 points.\n\n";
 
+    cout << "=== Query Range ===\n";
     BoundingBox region{0,5,0,5,0,5};
     vector<Point> results;
     queryRange(&root, region, results);
-
+    cout << "Points in region [0,5]^3:\n";
     for(auto& p : results) {
         cout << "(" << p.x << "," << p.y << "," << p.z << ")\n";
     }
+    cout << "\n";
+
+    cout << "=== Nearest Neighbor ===\n";
+    Point query{4,4,4};
+    Point nearest = findNearestNeighbor(&root, query);
+    cout << "Nearest to (4,4,4): (" 
+         << nearest.x << "," << nearest.y << "," << nearest.z << ")\n\n";
+
+    cout << "=== k-Nearest Neighbors (k=3) ===\n";
+    vector<Point> knn = findKNearestNeighbor(&root, query, 3);
+    cout << "3 nearest to (4,4,4):\n";
+    for(auto& p : knn) {
+        cout << "(" << p.x << "," << p.y << "," << p.z << ")\n";
+    }
+    cout << "\n";
+
+    cout << "=== Deletion ===\n";
+    bool removed = removePoint(&root, Point{5,5,5});
+    cout << "Removed (5,5,5): " << (removed ? "success" : "not found") << "\n";
+
+    // verifying deletion by querying again
+    results.clear();
+    queryRange(&root, region, results);
+    cout << "Points in region [0,5]^3 after deletion:\n";
+    for(auto& p : results) {
+        cout << "(" << p.x << "," << p.y << "," << p.z << ")\n";
+    }
+
     return 0;
-
-    // output:
-    // (1,1,1)
-    // (5,5,5)
 }
-
-// safer version: octree_raii.cpp with RAII safety
-// RAII - Resource Acquisition Is Initialization
