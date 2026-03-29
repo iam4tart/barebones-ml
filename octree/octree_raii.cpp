@@ -9,7 +9,7 @@
 // graphics engine use octrees to manage visibility and level of detail
 
 // my use-case: organize 3d points for fast search and compression
-
+// #include "octree_node.h"
 #include <iostream>
 #include <vector>
 #include <limits>
