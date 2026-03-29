@@ -21,8 +21,6 @@
 
 ## Usage Examples (Python)
 
-Here’s your workflow split into clear, separate code blocks:
-
 ```python
 import torch, libtorch_octree_raii
 ```
