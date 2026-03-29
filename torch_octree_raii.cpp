@@ -1,5 +1,5 @@
-#include <torch/extension.h>
 #include <torch/torch.h>
+#include <torch/extension.h>
 #include <torch/script.h>
 
 #include <iostream>
@@ -73,6 +73,16 @@ void subdivide(OctreeNode* node) {
     for(int i=0; i<8; i++) {
         node->children[i] = std::make_unique<OctreeNode>(boxes[i]);
     }
+}
+
+OctreeNode* queryNode(OctreeNode* node, const Point& p) {
+    if(!node->boundary.contains(p)) return nnullptr;
+    if(node->children[0] == nullptr) return node;
+    for(int i=0; i<8; i++) {
+        OctreeNode* found = queryNode(node->children[i].get(), p);
+        if(found) return found;
+    }
+    return node;
 }
 
 void redistribute_points(OctreeNode* node) {
@@ -304,6 +314,17 @@ void redistribute_root() {
     redistribute_points(&root);
 }
 
+bool redistribute_query(torch::Tensor query) {
+    auto acc = query.accessor<float, 1>();
+    Point p{acc[0], acc[1], acc[2]};
+    OctreeNode* target = queryNode(&root, p);
+    if(target) {
+        redistribute_points(target);
+        return true;
+    }
+    return false;
+}
+
 TORCH_LIBRARY(libtorch_octree_raii, m) {
     m.def("insert_points(Tensor pts) -> ()", insert_points);
     m.def("query_range(Tensor box) -> Tensor", query_range);
@@ -312,4 +333,5 @@ TORCH_LIBRARY(libtorch_octree_raii, m) {
     m.def("remove_point(Tensor pt) -> bool", remove_point);
     m.def("subdivide() -> ()", force_subdivide);
     m.def("redistribute() -> ()", redistribute_root);
+    m.def("redistribute_query(Tensor query) -> bool", redistribute_query);
 }
