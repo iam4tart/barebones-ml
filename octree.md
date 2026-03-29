@@ -18,7 +18,6 @@
 | `redistribute()` | none | `void` | Push root’s points down into children. |
 | `redistribute_query(Tensor query)` | `[3]` | `bool` | Redistribute the node containing the query point. |
 
----
 
 ## Usage Examples (Python)
 
@@ -62,7 +61,6 @@ torch.ops.libtorch_octree_raii.redistribute()
 torch.ops.libtorch_octree_raii.redistribute_query(q)
 ```
 
----
 
 # Future Work
 
