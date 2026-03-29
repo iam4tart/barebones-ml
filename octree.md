@@ -63,15 +63,10 @@ torch.ops.libtorch_octree_raii.redistribute_query(q)
 # Future Work
 
 ## ⚡ Performance Improvements
-- [ ] **Batch insertion**: optimize `insert_points` to distribute points in one traversal instead of looping point‑by‑point.  
-- [ ] **Memory reuse**: pre‑allocate buffers in `pointsToTensor` and avoid repeated allocations.  
-- [ ] **Lazy subdivision**: only subdivide when strictly necessary to reduce overhead.  
-- [ ] **Priority traversal in nearest neighbor**: visit closest child first, prune others if bounding box distance exceeds current best.  
-- [ ] **Parallel queries**: use OpenMP or Torch parallel primitives for large range/k‑NN queries.  
+- [ ] **Batch insertion**: handle multiple points in one traversal to reduce recursion overhead.  
+- [ ] **Priority traversal in nearest neighbor**: check closest child first and prune others early.  
+- [ ] **Lazy subdivision**: subdivide nodes only when strictly necessary.  
 
 ## 🛡️ Error Handling
 - [ ] **Validate tensor shapes**: enforce `[N,3]`, `[6]`, `[3]` inputs with clear error messages.  
-- [ ] **Out‑of‑bounds points**: report skipped points or optionally expand root boundary.  
-- [ ] **Empty query results**: return empty tensors safely.  
-- [ ] **Redistribution safety**: return `false` or error if called on a node without children.  
-- [ ] **Remove point feedback**: extend return codes (`0 = not found, 1 = removed, 2 = removed + collapsed children`).  
+- [ ] **Out‑of‑bounds points**: report skipped points or optionally expand root boundary.
