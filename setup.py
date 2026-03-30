@@ -6,7 +6,7 @@ setup(
     ext_modules=[
         CppExtension(
             name='barebones.libs.octree',
-            sources=['src/cpp/octree/torch_octree.cpp'],
+            sources=['src/data-structure/octree/torch_octree.cpp'],
         ),
     ],
     cmdclass={
