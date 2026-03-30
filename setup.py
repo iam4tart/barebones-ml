@@ -2,11 +2,11 @@ from setuptools import setup
 from torch.utils.cpp_extension import BuildExtension, CppExtension
 
 setup(
-    name='libtorch_octree_raii',
+    name='barebones',
     ext_modules=[
         CppExtension(
-            name='libtorch_octree_raii',
-            sources=['torch_octree_raii.cpp'],
+            name='barebones.libs.octree',
+            sources=['src/cpp/octree/torch_octree.cpp'],
         ),
     ],
     cmdclass={

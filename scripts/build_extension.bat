@@ -6,9 +6,8 @@ if exist build (
 )
 
 REM compile and install the extension
-echo Building libtorch_octree_raii extension...
-python setup.py build
-python setup.py install
+echo Building barebones extension...
+python setup.py build_ext --inplace
 
 REM clean build folder again after successful build
 if exist build (
@@ -16,5 +15,5 @@ if exist build (
     rmdir /s /q build
 )
 
-echo Done! The .pyd file should now be available in your Python environment.
+echo Done! Run 'from barebones import octree' in Python.
 pause

@@ -10,12 +10,15 @@
 
 // my use-case: organize 3d points for fast search and compression
 
+#pragma once
+
 #include <iostream>
 #include <vector>
-#include <limits>
-#include <cmath>
+#include <array>
+#include <memory>
 #include <queue>
-using namespace std;
+#include <cmath>
+#include <limits>
 
 struct Point {
     float x, y, z;
@@ -29,7 +32,7 @@ struct Neighbor {
     bool operator<(const Neighbor& other) const {
         return dist < other.dist; // max-heap
     }
-}
+};
 
 struct BoundingBox {
     float x_min, x_max;
@@ -60,16 +63,15 @@ struct BoundingBox {
 
 struct OctreeNode {
     BoundingBox boundary; // cube region
-    vector<Point> points; // points/actual data stored inside the cube
-    OctreeNode* children[8] = {nullptr}; // 8 child nodes (sub-cubes)
+    std::vector<Point> points; // points/actual data stored inside the cube
+
+    // using smart pointers (RAII)
+    // 8 child nodes (sub-cubes)
+    std::array<std::unique_ptr<OctreeNode>, 8> children;
 
     OctreeNode(const BoundingBox& box) : boundary(box) {}
 
-    ~OctreeNode() {
-        for(int i=0; i<8; i++) {
-            delete children[i]; // safe even if nullptr
-        }
-    }
+    // no need for custom destructor - unique_ptr handles cleanup
 };
 
 void subdivide(OctreeNode* node) {
@@ -91,15 +93,41 @@ void subdivide(OctreeNode* node) {
 
     // assign children
     for(int i=0; i<8; i++) {
-        node->children[i] = new OctreeNode(boxes[i]);
+        node->children[i] = std::make_unique<OctreeNode>(boxes[i]);
     }
+}
+
+OctreeNode* queryNode(OctreeNode* node, const Point& p) {
+    if(!node->boundary.contains(p)) return nullptr;
+    if(node->children[0] == nullptr) return node;
+    for(int i=0; i<8; i++) {
+        OctreeNode* found = queryNode(node->children[i].get(), p);
+        if(found) return found;
+    }
+    return node;
 }
 
 // inserting points in octree
 
-// design choice 
+// design choice
 // higher MAX_POINTS, higher points in a cube, creating more levels slowly
 const int MAX_POINTS = 4;
+
+void insert(OctreeNode* node, const Point& p);
+
+void redistribute_points(OctreeNode* node) {
+    if(node->children[0] == nullptr) return;
+
+    for(const auto& p : node->points) {
+        for(int i=0; i<8; i++) {
+            if(node->children[i]->boundary.contains(p)) {
+                insert(node->children[i].get(), p);
+                break;
+            }
+        }
+    }
+    node->points.clear();
+}
 
 void insert(OctreeNode* node, const Point& p) {
     // check if point is inside this node's boundary
@@ -118,7 +146,10 @@ void insert(OctreeNode* node, const Point& p) {
         for(const auto& oldPoint : node->points) {
             for(int i=0; i<8; i++) {
                 if(node->children[i]->boundary.contains(oldPoint)) {
-                    insert(node->children[i], oldPoint);
+                    // .get() comes from RAII where it gives you
+                    // raw pointer without transferring ownership
+                    // ownership stays with unique_ptr
+                    insert(node->children[i].get(), oldPoint);
                     break;
                 }
             }
@@ -129,18 +160,18 @@ void insert(OctreeNode* node, const Point& p) {
     // insert new point into the correct child
     for(int i=0; i<8; i++) {
         if(node->children[i]->boundary.contains(p)) {
-            insert(node->children[i], p);
+            insert(node->children[i].get(), p);
             break;
         }
     }
 }
 
-// cool fact - time complexity of insertion in octree is closer to O(log n) (depth of tree) 
+// cool fact - time complexity of insertion in octree is closer to O(log n) (depth of tree)
 // rather than O(n^3)
 // each insertion costs proportional to tree depth
 // each subdivision costs proportional to threshold (constant) (MAX_POINTS)
 
-// why - 
+// why -
 // when a node subdivides, redistribution happens only for a few points stored in that node
 // and not the reshuffling of complete data - just local points
 // redistribution is constant, independent of total n
@@ -169,35 +200,34 @@ bool removePoint(OctreeNode* node, const Point& p) {
     // if the node has been subdivided and has children, loop through all
     if(node->children[0] != nullptr) {
         for(int i=0; i<8; i++) {
-            if(removePoint(node->children[i], p)) {
-                    // after successful deletion, try merging back
-                    bool allEmpty = true;
-                    for(int j=0; j<8; j++) {
-                        // are all of this node's children completely empty?
-                        // if child still has points or if child itself has been subdidivded further meaning 
-                        // it has grandchildren and is not empty
-                        if(node->children[j]->points.size() > 0 || node->children[j]->children[0] != nullptr) {
-                            allEmpty = false;
-                            break;
-                        }
+            if(removePoint(node->children[i].get(), p)) {
+                // after successful deletion, try merging back
+                bool allEmpty = true;
+                for(int j=0; j<8; j++) {
+                    // are all of this node's children completely empty?
+                    // if child still has points or if child itself has been subdidivded further meaning
+                    // it has grandchildren and is not empty
+                    if(node->children[j]->points.size() > 0 || node->children[j]->children[0] != nullptr) {
+                        allEmpty = false;
+                        break;
                     }
-                    // cleaning up the structure after the point has been removed
-                    if(allEmpty) {
-                        for(int j=0; j<8; j++) {
-                            delete node->children[j];
-                            node->children[j] = nullptr;
-                        }
-                    }
-                    return true;
                 }
+                // cleaning up the structure after the point has been removed
+                if(allEmpty) {
+                    for(int j=0; j<8; j++) {
+                        node->children[j].reset(); // safely deletes and sets nullptr
+                    }
+                }
+                return true;
             }
         }
-        return false; // not found
     }
+    return false; // not found
+}
 
 // querying or searching for points within a given region (range) - O(log n + k) where k is the number of points found
 // usecases: collision detection, visibility checks, spatial filtering
-void queryRange(const OctreeNode* node, const BoundingBox& range, vector<Point>& results) {
+void queryRange(OctreeNode* node, const BoundingBox& range, std::vector<Point>& results) {
     // if node's boundary doesn't intersect query range, skip
     if(!node->boundary.intersects(range)) return;
 
@@ -211,7 +241,7 @@ void queryRange(const OctreeNode* node, const BoundingBox& range, vector<Point>&
     // recurse into children if they exist
     if(node->children[0] != nullptr) {
         for(int i=0; i<8; i++) {
-            queryRange(node->children[i], range, results);
+            queryRange(node->children[i].get(), range, results);
         }
     }
 }
@@ -221,7 +251,7 @@ float distance(const Point& a, const Point& b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     float dz = a.z - b.z;
-    return sqrt(dx*dx + dy*dy + dz*dz);
+    return std::sqrt(dx*dx + dy*dy + dz*dz);
 }
 
 // euclidean distance from a query point to a bounding box
@@ -229,10 +259,10 @@ float distance(const Point& a, const Point& b) {
 // if a point is outside, how far the point from the nearest face/edge/corner of the box
 float distanceToBox(const Point& p, const BoundingBox& box) {
     // {postitive only if point is left of box, point inside box, positive only if point is right of box}
-    float dx = max({box.x_min-p.x, 0.0f, p.x-box.x_max});
-    float dy = max({box.y_min - p.y, 0.0f, p.y - box.y_max});
-    float dz = max({box.z_min - p.z, 0.0f, p.z - box.z_max});
-    return sqrt(dx*dx + dy*dy + dz*dz);
+    float dx = std::max({box.x_min-p.x, 0.0f, p.x-box.x_max});
+    float dy = std::max({box.y_min - p.y, 0.0f, p.y - box.y_max});
+    float dz = std::max({box.z_min - p.z, 0.0f, p.z - box.z_max});
+    return std::sqrt(dx*dx + dy*dy + dz*dz);
 }
 
 // it also tells us whether a whole cube (subtree) could possibly contain a closer point
@@ -241,7 +271,7 @@ float distanceToBox(const Point& p, const BoundingBox& box) {
 // querying or search the closest point(s) to a query point - average: O(log n), worst: O(n)
 // usecases: compression, clustering, pathfinding, similarity search
 void nearestNeighbor(const OctreeNode* node, const Point& query, Point& bestPoint, float& bestDist) {
-    
+
     // if the closest possible distance from the query point to this node's cube
     // is already worse than the best distance so far, skip the entire subtree
     // branch-and-bound pruning
@@ -260,7 +290,7 @@ void nearestNeighbor(const OctreeNode* node, const Point& query, Point& bestPoin
     // recurse into children if they exist
     if(node->children[0] != nullptr) {
         for(int i=0; i<8; i++) {
-            nearestNeighbor(node->children[i], query, bestPoint, bestDist);
+            nearestNeighbor(node->children[i].get(), query, bestPoint, bestDist);
         }
     }
 }
@@ -269,12 +299,12 @@ void nearestNeighbor(const OctreeNode* node, const Point& query, Point& bestPoin
 Point findNearestNeighbor(const OctreeNode* root, const Point& query) {
     Point bestPoint{}; // declare and initalize to 0
     // largest finite float [IEEE-754] (~ 3.4e38) better than 1e9 or little higher
-    float bestDist = numeric_limits<float>::infinity();
+    float bestDist = std::numeric_limits<float>::infinity();
     nearestNeighbor(root, query, bestPoint, bestDist);
     return bestPoint;
 }
 
-void kNearestNeighbor(const OctreeNode* node, const Point& query, priority_queue<Neighbor>& heap, int k) {
+void kNearestNeighbor(const OctreeNode* node, const Point& query, std::priority_queue<Neighbor>& heap, int k) {
     float boxDist = distanceToBox(query, node->boundary);
     if(!heap.empty() && boxDist > heap.top().dist) return; // prune
 
@@ -289,47 +319,20 @@ void kNearestNeighbor(const OctreeNode* node, const Point& query, priority_queue
     // recurse into children
     if(node->children[0] != nullptr) {
         for(int i=0; i<8; i++) {
-            kNearestNeighbor(node->children[i], query, heap, k);
+            kNearestNeighbor(node->children[i].get(), query, heap, k);
         }
     }
 }
 
 // wrapper function
-vector<Point> findKNearestNeighbor(const OctreeNode* root, const Point& query, int k) {
-    priority_queue<Neighbor> heap; // max-heap using operator<
+std::vector<Point> findKNearestNeighbor(const OctreeNode* root, const Point& query, int k) {
+    std::priority_queue<Neighbor> heap; // max-heap using operator<
     kNearestNeighbor(root, query, heap, k);
-    
-    vector<Point> result;
+
+    std::vector<Point> result;
     while(!heap.empty()) {
         result.push_back(heap.top().point);
         heap.pop();
     }
     return result;
 }
-
-
-// driver code
-int main() {
-    BoundingBox rootBox{0,10,0,10,0,10};
-    OctreeNode root(rootBox);
-
-    insert(&root, Point{1,1,1});
-    insert(&root, Point{9,9,9});
-    insert(&root, Point{5,5,5});
-
-    BoundingBox region{0,5,0,5,0,5};
-    vector<Point> results;
-    queryRange(&root, region, results);
-
-    for(auto& p : results) {
-        cout << "(" << p.x << "," << p.y << "," << p.z << ")\n";
-    }
-    return 0;
-
-    // output:
-    // (1,1,1)
-    // (5,5,5)
-}
-
-// safer version: octree_raii.cpp with RAII safety
-// RAII - Resource Acquisition Is Initialization
