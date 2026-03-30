@@ -94,20 +94,107 @@ struct MetadataTree
     }
 
     // LCA : lowest common ancestor of two nodes by path
-    Node* lca(const string& path_a, string& path_b) {
+    // naive - O(depth)
+    Node* lca(const string& path_a, const string& path_b) {
         if(!path_to_node.count(path_a)) {
             cerr << "ERROR: path not found: " << path_a << "\n";
             return nullptr;
         }
 
         if(!path_to_node.count(path_b)) {
-            cerr << "ERROR: path node found: " << path_b << "\n"; 
+            cerr << "ERROR: path not found: " << path_b << "\n"; 
             return nullptr;
         }
 
         Node* a = path_to_node[path_a];
         Node* b = path_to_node[path_b];
 
+        // walk both nodes up to the same depth first
+        while(a->depth > b->depth) a = a->parent;
+        while(b->depth > a->depth) b = b->parent;
 
+        // now both at same depth, walk up together
+        while(a != b) {
+            a = a->parent;
+            b = b->parent;
+        }
+
+        return a;
+    }
+
+    // print subtree rooted at a given path (for debug, in YAML format)
+    void print_subtree(const string& path, int indent = 0) {
+        if(!path_to_node.count(path)) return;
+
+        Node* node = path_to_node[path];
+        
+    }
+
+    // print stats
+    void print_stats() {
+        int max_depth = 0;
+        int leaf_count = 0;
+        
+        for(auto& [path, node] : path_to_node) {
+            max_depth = max(max_depth, node->depth);
+            if(node->children.empty()) leaf_count++;
+        }
+
+        cout << "total nodes: " << path_to_node.size() << "\n";
+        cout << "max depth: " << max_depth << "\n";
+        cout << "leaf nodes: " << leaf_count << "\n";
+    }
+
+    // clean heap memory
+    ~MetadataTree() {
+        for(auto& [path, node] : path_to_node) delete node;
     }
 };
+
+void query(MetadataTree& tree, const string& a, const string& b) {
+    cout << "\nLCA query:\n";
+    cout << " A: " << a << "\n";
+    cout << " B: " << b << "\n";
+    Node* result = tree.lca(a,b);
+    if(result) {
+        cout << " LCA: " << result->absolute_path << "\n (depth=" << result->depth << ")\n";
+    }
+}
+
+int main()
+{
+    MetadataTree tree;
+    tree.load_from_file("metadata_parts.txt");
+
+    std::cout << "\n--- Tree Stats ---\n";
+    tree.print_stats();
+
+    std::cout << "\n--- Propulsion Subtree ---\n";
+    tree.print_subtree("drone/propulsion");
+
+    query(tree,
+          "drone/propulsion/rotor_fl/motor/rotor_bell/magnet_n_1/neodymium_core",
+          "drone/propulsion/rotor_fl/motor/stator/winding_a/copper_wire");
+
+    query(tree,
+          "drone/propulsion/rotor_fl/propeller/blade_1/tip",
+          "drone/propulsion/rotor_fr/propeller/blade_1/tip");
+
+    query(tree,
+          "drone/propulsion/rotor_fl/motor/shaft/bearing_top/ball_1",
+          "drone/propulsion/rotor_fl/esc/pcb/mosfet_1");
+
+    query(tree,
+          "drone/propulsion/rotor_fl/motor/stator/winding_a",
+          "drone/sensors/gps/antenna/patch_element");
+
+    query(tree,
+          "drone/flight_controller/fc_board/imu/gyroscope/mems_die",
+          "drone/flight_controller/fc_board/imu/accelerometer/mems_die");
+
+    query(tree,
+          "drone/propulsion/rotor_fl/motor",
+          "drone/propulsion/rotor_fl/motor");
+
+    return 0;
+}
