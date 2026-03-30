@@ -16,7 +16,7 @@ struct Node
     Node *parent;
     vector<Node *> children;
 
-    Node(string name, string absolute_path, int depth, Node *parent) : name(name), absolute_path(absolute_path), parent(parent) {}
+    Node(string name, string absolute_path, int depth, Node *parent) : name(name), absolute_path(absolute_path), depth(depth), parent(parent) {}
 };
 
 // tree owns all nodes
@@ -90,7 +90,7 @@ struct MetadataTree
                 continue;
             insert(line);
         }
-        cout << "loaded " << path_to_node.size() << " nodes from " << filepath << "\n";
+        cerr << "LOG: loaded " << path_to_node.size() << " nodes from " << filepath << "\n";
     }
 
     // LCA : lowest common ancestor of two nodes by path
@@ -124,11 +124,31 @@ struct MetadataTree
 
     // print subtree rooted at a given path (for debug, in YAML format)
     void print_subtree(const string& path, int indent = 0) {
-        if(!path_to_node.count(path)) return;
+    if(!path_to_node.count(path)) return;
+    
+    Node* node = path_to_node[path];
+    string spacing(indent * 2, ' ');
 
-        Node* node = path_to_node[path];
+
+    cout << spacing << node->name << ":";
+    
+    if (node->children.empty()) {
+
+        cout << " leaf # depth " << node->depth << "\n";
+    } else {
+        cout << " # depth " << node->depth << "\n";
         
+
+        vector<Node*> sorted_children = node->children;
+        sort(sorted_children.begin(), sorted_children.end(), [](Node* a, Node* b) {
+            return a->name < b->name;
+        });
+
+        for(Node* child : sorted_children) {
+            print_subtree(child->absolute_path, indent + 1);
+        }
     }
+}
 
     // print stats
     void print_stats() {
