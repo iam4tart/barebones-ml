@@ -68,11 +68,11 @@ octree.redistribute_query(q)
 
 # Future Work
 
-## ⚡ Performance Improvements
+## Performance Improvements
 - [ ] **Batch insertion**: handle multiple points in one traversal to reduce recursion overhead.  
 - [ ] **Priority traversal in nearest neighbor**: check closest child first and prune others early.  
 - [ ] **Lazy subdivision**: subdivide nodes only when strictly necessary.  
 
-## 🛡️ Error Handling
+## Error Handling
 - [ ] **Validate tensor shapes**: enforce `[N,3]`, `[6]`, `[3]` inputs with clear error messages.  
 - [ ] **Out‑of‑bounds points**: report skipped points or optionally expand root boundary.
