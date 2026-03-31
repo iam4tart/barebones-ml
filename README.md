@@ -12,3 +12,4 @@ scripts\build_extension.bat
 ## Modules
 
 - [Octree](/docs/octree.md) — contains C++ implementation of Octree with PyTorch bindings for 3D spatial search and point cloud tasks.
+- [Lowest Common Ancestor](/src/algorithm/lca/part_tree.txt) - contains results of LCA query on a hierarchical 3D model structure provided metadata is available.
