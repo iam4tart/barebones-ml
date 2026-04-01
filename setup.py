@@ -8,8 +8,13 @@ setup(
             name='barebones.libs.octree',
             sources=[
                 'src/data-structure/octree/torch_octree.cpp',
-                "src/metric/chamfer-distance/torch_chamfer_distance.cpp"
-                ],
+            ],
+        ),
+        CppExtension(
+            name='barebones.libs.chamfer',
+            sources=[
+                'src/metric/chamfer-distance/torch_chamfer_distance.cpp',
+            ],
         ),
     ],
     cmdclass={

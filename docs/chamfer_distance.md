@@ -12,3 +12,5 @@ $$CD(A, B) = \frac{1}{|A|} \sum_{a \in A} \min_{b \in B} \|a - b\|^2
 ```
 CD(A, B) = mean_ab + mean_ba
 ```
+
+- might add RAII safety to chamfer_distance.h

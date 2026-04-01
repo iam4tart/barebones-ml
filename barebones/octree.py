@@ -1,5 +1,5 @@
 import torch
-from barebones.libs import octree as _ext
+from barebones.libs import octree as _octree
 
 def insert_points(pts: torch.Tensor) -> None:
     torch.ops.barebones_octree.insert_points(pts)
