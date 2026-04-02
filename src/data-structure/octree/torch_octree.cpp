@@ -80,6 +80,21 @@ bool redistribute_query(torch::Tensor query) {
     return false;
 }
 
+void save_octree(std::string path) {
+    std::ofstream os(path, std::ios::binary);
+    serialize(&root, os);
+}
+
+void load_octree(std::string path) {
+    // load file with binary flag
+    std::ifstream is(path, std::ios::binary);
+    // delete any existing children to prevent memory leaks or overlapping trees
+    for(auto& child : root.children) child.reset();
+    // clear the root's points so we do NOT double count them
+    root.points.clear();
+    deserialize(&root, is);
+}
+
 TORCH_LIBRARY(barebones_octree, m) {
     m.def("insert_points(Tensor pts) -> ()", insert_points);
     m.def("query_range(Tensor box) -> Tensor", query_range);
@@ -89,4 +104,6 @@ TORCH_LIBRARY(barebones_octree, m) {
     m.def("subdivide() -> ()", force_subdivide);
     m.def("redistribute() -> ()", redistribute_root);
     m.def("redistribute_query(Tensor query) -> bool", redistribute_query);
+    m.def("save_octree(str path) -> ()", save_octree);
+    m.def("load_octree(str path) -> ()", load_octree);
 }

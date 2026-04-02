@@ -24,3 +24,9 @@ def redistribute() -> None:
 
 def redistribute_query(query: torch.Tensor) -> bool:
     return torch.ops.barebones_octree.redistribute_query(query)
+
+def save(path: str) -> None:
+    torch.ops.barebones_octree.save_octree(path)
+
+def load(path: str) -> None:
+    torch.ops.barebones_octree.load_octree(path)

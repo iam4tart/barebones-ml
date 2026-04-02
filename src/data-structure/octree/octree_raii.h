@@ -19,6 +19,7 @@
 #include <queue>
 #include <cmath>
 #include <limits>
+#include <fstream>
 
 struct Point {
     float x, y, z;
@@ -335,4 +336,54 @@ std::vector<Point> findKNearestNeighbor(const OctreeNode* root, const Point& que
         heap.pop();
     }
     return result;
+}
+
+// write tree to stream
+void serialize(const OctreeNode* node, std::ostream& os) {
+    if(!node) return;
+
+    bool isLeaf = (node->children[0] == nullptr);
+    // start at the memory address of isLeaf, treat what you find there
+    // as a raw sequence of bytes and copy exactly one byte into the file
+    // this tells deserialize if the node contains points or children
+    os.write(reinterpret_cast<const char*>(&isLeaf), sizeof(bool));
+
+    if(isLeaf) {
+        // node contains points
+        size_t numPoints = node->points.size();
+        // write total count of points to the binary, tells how much memory to allocate
+        os.write(reinterpret_cast<const char*>(&numPoints), sizeof(size_t));
+        // go to the start of the actual point in RAM (.data()) and copy entire
+        // block of memory (count * 12 bytes per point) to the disk
+        // x,y,z - three floats - 12 bytes
+        os.write(reinterpret_cast<const char*>(node->points.data()), numPoints*sizeof(Point));
+    }
+    else {
+        // node contains children
+        // recurse and visit all 8 children in order (similar to pre-order traversal in BT)
+        for(int i=0; i<8; ++i) {
+            serialize(node->children[i].get(), os);
+        }
+    }
+}
+
+// reconstruct tree from stream
+void deserialize(OctreeNode* node, std::os) {
+    bool isLeaf;
+    os.read(reinterpret_cast<char*>(&isLeaf), sizeof(bool));
+
+    if(isLeaf) {
+        size_t numPoints;
+        os.read(reinterpret_cast<char*>(&numPoints), sizeof(size_t));
+        // allocate memory and change vector size to numPoints
+        node->points.resize(numPoints);
+        // copy bits from dile into vector data buffer
+        os.read(reinterpret_cast<char*>(node->points.data()), numPoints*sizeof(Point));
+    }
+    else {
+        subdivide(node);
+        for(int i=0; i<8; ++i) {
+            deserialize(node->children[i].get(), os);
+        }
+    }
 }
