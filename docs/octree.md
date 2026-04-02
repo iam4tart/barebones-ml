@@ -76,3 +76,4 @@ octree.redistribute_query(q)
 ## Error Handling
 - [ ] **Validate tensor shapes**: enforce `[N,3]`, `[6]`, `[3]` inputs with clear error messages.  
 - [ ] **Out‑of‑bounds points**: report skipped points or optionally expand root boundary.
+- [ ] **Remove endian dependency in serialization**
