@@ -147,7 +147,20 @@ class ModelNet40(Dataset):
         return len(self.points)
     
     def __getitem__(self, idx):
-        pts = self.points[idx]
+        pts = self.points[idx] # [2048, 3]
         label = int(self.labels[idx])
         
         # subsample to num_points
+        pts = random_point_sample(pts, self.num_points) # [num_points, 3]
+        
+        # normalize to unit sphere centered at origin
+        pts = normalize_point_cloud(pts)
+        
+        # augmentation - only during training
+        if self.augment:
+            pts = random_rotate_y(pts)
+            pts = random_jitter(pts)
+            
+        pts = torch.from_numpy(pts.astype(np.float32)) # [num_points, 3]
+        label = torch.Tensor(label, dtype=torch.long)
+        return pts, label
