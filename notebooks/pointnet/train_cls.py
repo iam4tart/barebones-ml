@@ -78,7 +78,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
-        pin_memory=True
+        pin_memory=True # parallel processing
     )
     
     test_loader = DataLoader(
@@ -90,7 +90,40 @@ def main():
     )
     
     model = PointNetCls(num_classes=40, feature_transform=True).to(device)
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"model params: {total_params:,}")
+    total_trainable_params = sum(p.numel() for p in model.parameters())
+    print(f"model params: {total_trainable_params:,}")
     
+    # steplr: 1/2 lr every 20 epochs - matches original pointnet paper
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     
+    os.makedirs(args.ckpt_dir, exist_ok=True)
+    best_acc = 0.0
+    
+    for epoch in range(1, args.epoch+1):
+        train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, device)
+        test_acc = eval_one_epoch(model, test_loader, device)
+        scheduler.step()
+        
+        print(
+            f"epoch {epoch:3d}/{args.epochs} | "
+            f"loss {train_loss:.4f} | "
+            f"train acc {train_acc*100:.1f}% | "
+            f"test acc {test_acc*100:.1f}% | "
+            f"lr {scheduler.get_last_lr()[0]:.6f}"
+        )
+        
+        # save best checkpoint
+        if test_acc > best_acc:
+            best_acc = test_acc
+            ckpt_path = os.path.join(args.ckpt_dir, "pointnet_cls_best.pth")
+            torch.save({
+                "epoch": epoch,
+                "state_dict": model.state_dict(),
+                "test_acc": test_acc,
+                "args": vars(args),
+            }, ckpt_path)
+            print(f" saved best checkpoint -> {ckpt_path}")
+            
+if __name__ == "__main__":
+    main()
