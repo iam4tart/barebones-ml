@@ -17,8 +17,8 @@ def parse_args():
     parser.add_argument("--num_points", type=int, default=1024)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--data_root", type=str, default="./data")
-    parser.add_argument("--ckpt_dir", type=str, default="./checkpoints")
+    parser.add_argument("--data_root", type=str, default="./datasets")
+    parser.add_argument("--ckpt_dir", type=str, default="./notebooks/checkpoints")
     parser.add_argument("--num_workers", type=int, default=4)
     return parser.parse_args()
 
@@ -61,6 +61,7 @@ def eval_one_epoch(model, loader, device):
     correct = 0
     total = 0
     
+    pbar = tqdm(loader, desc="eval ", leave=False)
     for pts, labels in loader:
         pts = pts.to(device)
         labels = labels.to(device)
@@ -70,7 +71,11 @@ def eval_one_epoch(model, loader, device):
         correct = (preds == labels).sum().item()
         total += pts.size(0)
         
+        pbar.set_postfix({"acc": f"{correct/total*100:.1f}%"})
+        
     return correct/total
+
+
 
 def main():
     args = parse_args()
@@ -115,17 +120,26 @@ def main():
     os.makedirs(args.ckpt_dir, exist_ok=True)
     best_acc = 0.0
     
+    log_path = os.path.join(args.ckpt_dir, "training_log.csv")
+    with open(log_path, "w") as f:
+        f.write("epoch,train_loss,train_acc,test_acc,lr\n")
+    
     for epoch in range(1, args.epochs+1):
         train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, device)
         test_acc = eval_one_epoch(model, test_loader, device)
         scheduler.step()
+        
+        current_lr = scheduler.get_last_lr()[0]
+        
+        with open(log_path, "a") as f:
+            f.write(f"{epoch},{train_loss:.4f},{train_acc:.4f},{test_acc:.4f},{current_lr:.6f}\n")
         
         print(
             f"epoch {epoch:3d}/{args.epochs} | "
             f"loss {train_loss:.4f} | "
             f"train acc {train_acc*100:.1f}% | "
             f"test acc {test_acc*100:.1f}% | "
-            f"lr {scheduler.get_last_lr()[0]:.6f}"
+            f"lr {current_lr:.6f}"
         )
         
         # save best checkpoint
@@ -141,6 +155,7 @@ def main():
             print(f" saved best checkpoint -> {ckpt_path}\n")
             
     print(f"best test accuracy: {best_acc*100:.1f}%")
+    print(f"training log saved -> {log_path}")
             
 if __name__ == "__main__":
     main()
