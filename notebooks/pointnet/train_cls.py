@@ -4,6 +4,7 @@ import argparse
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -27,9 +28,10 @@ def train_one_epoch(model, loader, optimizer, device):
     correct = 0
     total = 0
     
+    pbar = tqdm(loader, desc="training", leave=False)
     for pts, label in loader:
         pts = pts.to(device) # [B, N, 3]
-        labels = labels.to(device) # [B]
+        labels = label.to(device) # [B]
         
         optimizer.zero_grad()
         
@@ -45,6 +47,11 @@ def train_one_epoch(model, loader, optimizer, device):
         preds = logits.argmax(dim=1)
         correct += (preds == labels).sum().item()
         total += pts.size(0)
+        
+        pbar.set_postfix({
+            "loss": f"{loss.item():.4f}",
+            "acc":  f"{correct/total*100:.1f}%"
+        })
         
     return total_loss/total, correct/total
 
@@ -70,15 +77,23 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device: {device}")
     
+    # release any cached gpu memory from previous runs
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+        free, total = torch.cuda.mem_get_info()
+        print(f"gpu memory free: {free/1024**2:.0f} MB / {total/1024**2:.0f} MB")
+        
     train_ds = ModelNet40(args.data_root, "train", args.num_points, augment=True)
     test_ds = ModelNet40(args.data_root, "test", args.num_points, augment=False)
+    
+    pin_memory = device.type == "cuda"
     
     train_loader = DataLoader(
         train_ds,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
-        pin_memory=True # parallel processing
+        pin_memory=pin_memory # parallel processing
     )
     
     test_loader = DataLoader(
@@ -86,7 +101,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=True
+        pin_memory=pin_memory
     )
     
     model = PointNetCls(num_classes=40, feature_transform=True).to(device)
@@ -100,7 +115,7 @@ def main():
     os.makedirs(args.ckpt_dir, exist_ok=True)
     best_acc = 0.0
     
-    for epoch in range(1, args.epoch+1):
+    for epoch in range(1, args.epochs+1):
         train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, device)
         test_acc = eval_one_epoch(model, test_loader, device)
         scheduler.step()
@@ -123,7 +138,9 @@ def main():
                 "test_acc": test_acc,
                 "args": vars(args),
             }, ckpt_path)
-            print(f" saved best checkpoint -> {ckpt_path}")
+            print(f" saved best checkpoint -> {ckpt_path}\n")
+            
+    print(f"best test accuracy: {best_acc*100:.1f}%")
             
 if __name__ == "__main__":
     main()

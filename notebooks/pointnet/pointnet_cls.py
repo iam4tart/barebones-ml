@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pointnet_utils import PointnetEncoder, feature_transform_regularizer
+from pointnet_utils import PointNetEncoder, feature_transform_regularizer
 
 class PointNetCls(nn.Module):
     """
@@ -11,7 +11,7 @@ class PointNetCls(nn.Module):
     def __init__(self, num_classes=40, feature_transform=True):
         super().__init__()
         self.feature_transform = feature_transform
-        self.encoder = PointnetEncoder(global_feat=True, feature_transform=feature_transform)
+        self.encoder = PointNetEncoder(global_feat=True, feature_transform=feature_transform)
         
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)

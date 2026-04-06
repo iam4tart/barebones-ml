@@ -123,7 +123,7 @@ class PointNetEncoder(nn.Module):
             self.feature_tnet = TNet(k=64)
             
         self.conv2 = nn.Conv1d(64,128,1)
-        self.conv3 = nn.Conv1d(128, 1014, 1)
+        self.conv3 = nn.Conv1d(128, 1024, 1)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
         

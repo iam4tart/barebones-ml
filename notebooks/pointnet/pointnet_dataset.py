@@ -16,24 +16,35 @@ MODELNET40_URL = (
     "https://huggingface.co/datasets/Msun/modelnet40/blob/main/modelnet40_ply_hdf5_2048.zip"
 )
 
-def download_modelnet40(root="./datasets"):
-    """download and unzip modelnet40 hdf5 if not already present"""
-    zip_path = os.path.join(root, "modelnet40,zip")
-    data_path = os.path.join(root, "model40_ply_hdf5_2048")
-    
+def download_modelnet40(root="./data"):
+    data_path = os.path.join(root, "modelnet40_ply_hdf5_2048")
+
     if os.path.exists(data_path):
         print(f"modelnet40 already at {data_path}")
         return data_path
-    
+
+    MODELNET40_URL = "https://shapenet.cs.stanford.edu/media/modelnet40_ply_hdf5_2048.zip"
+    zip_path = os.path.join(root, "modelnet40_ply_hdf5_2048.zip")
+
     os.makedirs(root, exist_ok=True)
-    print(f"downloading modelnet40 to {zip_path} ...")
-    urllib.request.urlretrieve(MODELNET40_URL, zip_path)
+    print(f"modelnet40 not found — downloading to {zip_path} ...")
+
+    try:
+        urllib.request.urlretrieve(MODELNET40_URL, zip_path)
+    except Exception as e:
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+        raise RuntimeError(f"download failed: {e}\ndownload manually from {MODELNET40_URL} and extract to {root}/")
 
     print("extracting ...")
     with zipfile.ZipFile(zip_path, 'r') as z:
         z.extractall(root)
 
     os.remove(zip_path)
+
+    if not os.path.exists(data_path):
+        raise RuntimeError(f"extraction succeeded but {data_path} not found — check zip contents")
+
     print(f"done — {data_path}")
     return data_path
 
@@ -124,7 +135,7 @@ class ModelNet40(Dataset):
     """
     
     def __init__(self,
-                 root="./dataset",
+                 root="./data",
                  split="train",
                  num_points=1024,
                  augment=True):
@@ -162,5 +173,5 @@ class ModelNet40(Dataset):
             pts = random_jitter(pts)
             
         pts = torch.from_numpy(pts.astype(np.float32)) # [num_points, 3]
-        label = torch.Tensor(label, dtype=torch.long)
+        label = torch.tensor(label, dtype=torch.long)
         return pts, label
