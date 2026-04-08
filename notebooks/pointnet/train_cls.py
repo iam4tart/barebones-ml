@@ -68,7 +68,7 @@ def eval_one_epoch(model, loader, device):
         
         logits, feat_trans = model(pts)
         preds = logits.argmax(dim=1)
-        correct = (preds == labels).sum().item()
+        correct += (preds == labels).sum().item()
         total += pts.size(0)
         
         pbar.set_postfix({"acc": f"{correct/total*100:.1f}%"})
@@ -116,6 +116,25 @@ def main():
     # steplr: 1/2 lr every 20 epochs - matches original pointnet paper
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+    
+    # diagnosis
+    # print("\n--- test loader sanity check ---")
+    # pts, labels = next(iter(test_loader))
+    # print(f"pts shape:    {pts.shape}")
+    # print(f"labels shape: {labels.shape}")
+    # print(f"labels dtype: {labels.dtype}")
+    # print(f"labels sample: {labels[:8]}")
+    # print(f"labels min/max: {labels.min()} / {labels.max()}")
+    # model.eval()
+    # with torch.no_grad():
+    #     pts = pts.to(device)
+    #     labels = labels.to(device)
+    #     logits, _ = model(pts)
+    #     preds = logits.argmax(dim=1)
+    #     print(f"preds sample:  {preds[:8]}")
+    #     print(f"labels sample: {labels[:8]}")
+    #     print(f"match: {(preds == labels).sum().item()} / {len(labels)}")
+    # print("--- end sanity check ---\n")
     
     os.makedirs(args.ckpt_dir, exist_ok=True)
     best_acc = 0.0
