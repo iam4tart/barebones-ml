@@ -1,8 +1,20 @@
 //  farthest point sampling
 //  our usecase - select a subset of points that best represent the entire point cloud
+// basically selecting 5 balloons out of 10000 balloons which represents a room
 
 // random sampling may cluster points in one region
 // fps tends to spreads points uniformly accross space and produces better coverage of shape with less points
+
+// algorithm:
+// pick any starting point usually index 0
+// compute distance from every point to the selection set
+// pick the point with maximum distance - farthest from everything else
+// add it to selection, update distances
+// repeat until n sample points selected
+
+// dist[i] = min(dist[i], dist_to_new_added_point)
+// no need to compare distance against all selected points
+// because dist[i] already stores the min distance to all previous selections
 
 #pragma once
 
@@ -25,45 +37,42 @@ float sq_dist(const Point& a, const Point& b) {
 
 
 // time complexity - O(n * k)
-std::vector<Point> fps(const std::vector<Point>& points, int k) {
-    assert(points.size() > k);
+std::vector<int> fps(const std::vector<Point>& cloud, int n_samples, int start_idx=0) {
+    int N = static_cast<int>(cloud.size());
 
-    int n = points.size();
-    std::vector<Point> sampled;
-    sampled.reserve(k);
+    assert(N>0);
+    assert(n_samples > 0 && n_samples <= N);
 
-    // distances to nearest selected point
-    // initialize as max
-    std::vector<float> min_dist(n, std::numeric_limits<float>::max());
+    std::vector<float> dist(N, std::numeric_limits<float>::infinity());
 
-    // initialize rng 
-    std::mt19937 rng(std::random_device{}());
-    // define range
-    std::uniform_int_distribution<int> dist(0, n-1);
-    // random starting point to avoid bias
-    int current = dist(rng);
+    std::vector<int> selected;
+    selected.reserve(n_samples);
 
-    for(int i=0; i<k; ++i) {
-        const Point& p = points[current];
-        sampled.push_back(p);
+    selected.push_back(start_idx);
 
-        // update distances
-        for(int j=0; j<n; ++j) {
-            float d = sq_dist(p, points[j]);
-            if(d < min_dist[j]) {
-                min_dist[j] = d;
+    for(int s=1; s<n_samples; s++) {
+        int last = selected.back();
+
+        // if point i is closer to the last than to 
+        // any previous selection, update its min distance
+        for(int i=0; i<N; i++) {
+            float d = sq_dist(cloud[i], cloud[last]);
+            if(d < dist[i]) dist[i] = d;
+        }
+
+        // point with max distance to selection set
+        // this is the point least covered by current selection
+        int farthest = 0;
+        float max_d = -1.0f;
+        for(int i=0; i<N; i++) {
+            if(dist[i] > max_d) {
+                max_d = dist[i];
+                farthest = i;
             }
         }
 
-        // pick farthest point
-        float max_dist = -1.0f;
-        for(int j=0; j<n; ++j) {
-            if(min_dist[j] > max_dist) {
-                max_dist = min_dist[j];
-                current = j;
-            }
-        }
+        // add back to selection the covered point
+        selected.push_back(farthest);
     }
-
-    return sampled;
+    return selected;
 }
