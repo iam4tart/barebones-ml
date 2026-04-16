@@ -76,3 +76,27 @@ std::vector<int> fps(const std::vector<Point>& cloud, int n_samples, int start_i
     }
     return selected;
 }
+
+// return sampled points instead of indices
+std::vector<Point> fps_points(const std::vector<Point>& cloud, int n_samples, int start_idx=0) {
+    auto indices = fps(cloud, n_samples, start_idx);
+    std::vector<Point> result;
+    result.reserve(n_samples);
+    for(int idx : indices) result.push_back(cloud[idx]);
+    return result;
+}
+
+// to compare fps vs random sampling quality
+float mean_coverage(const std::vector<Point>& samples, std::vector<Point>& full) {
+    float total = 0.0f;
+    for(const auto& p : full) {
+        float best = std::numeric_limits<float>::infinity();
+        for(const auto& s : sampled) {
+            float d = sq_dist(p, s);
+            if(d<best) best = d;
+        }
+        total += std::sqrt(best);
+
+        return total/static_cast<float>(full.size());
+    }
+}
