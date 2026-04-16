@@ -87,7 +87,7 @@ std::vector<Point> fps_points(const std::vector<Point>& cloud, int n_samples, in
 }
 
 // to compare fps vs random sampling quality
-float mean_coverage(const std::vector<Point>& samples, std::vector<Point>& full) {
+float mean_coverage(const std::vector<Point>& sampled, std::vector<Point>& full) {
     float total = 0.0f;
     for(const auto& p : full) {
         float best = std::numeric_limits<float>::infinity();
