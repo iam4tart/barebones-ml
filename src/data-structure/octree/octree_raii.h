@@ -370,15 +370,16 @@ void serialize(const OctreeNode* node, std::ostream& os) {
 // reconstruct tree from stream
 void deserialize(OctreeNode* node, std::istream& is) {
     bool isLeaf;
+    if(!is) return;
     is.read(reinterpret_cast<char*>(&isLeaf), sizeof(bool));
 
     if(isLeaf) {
         size_t numPoints;
-        os.read(reinterpret_cast<char*>(&numPoints), sizeof(size_t));
+        is.read(reinterpret_cast<char*>(&numPoints), sizeof(size_t));
         // allocate memory and change vector size to numPoints
         node->points.resize(numPoints);
         // copy bits from dile into vector data buffer
-        os.read(reinterpret_cast<char*>(node->points.data()), numPoints*sizeof(Point));
+        is.read(reinterpret_cast<char*>(node->points.data()), numPoints*sizeof(Point));
     }
     else {
         subdivide(node);

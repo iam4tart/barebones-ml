@@ -14,7 +14,6 @@
 #include <cmath>
 #include <limits>
 #include <random>
-using namespace std;
 
 struct Point {
     float x, y, z;
@@ -39,8 +38,8 @@ float squared_dist(const Point& a, const Point& b) {
 
 // nearest neighbor distance from query point to cloud - naive O(m)
 // { might replace with octree nearestNeighbor() for large clouds }
-float nearest_sq_dist(const Point& query, const vector<Point>& cloud) {
-    float best = numeric_limits<float>::infinity();
+float nearest_sq_dist(const Point& query, const std::vector<Point>& cloud) {
+    float best = std::numeric_limits<float>::infinity();
     for(const auto& p : cloud) {
         float d = squared_dist(query, p);
         if(d < best) best = d;
@@ -50,7 +49,7 @@ float nearest_sq_dist(const Point& query, const vector<Point>& cloud) {
 
 // one-directional mean nearest neighbor distance from A to B
 // not symmetric on its own
-float mean_nn_dist(const vector<Point>& A, const vector<Point>& B) {
+float mean_nn_dist(const std::vector<Point>& A, const std::vector<Point>& B) {
     float sum = 0.0f;
     for(const auto& a : A) {
         sum += nearest_sq_dist(a, B);
@@ -61,7 +60,7 @@ float mean_nn_dist(const vector<Point>& A, const vector<Point>& B) {
 // full chamfer distance between two point clouds
 // symmetric: CD(A,B) == CD(B,A)
 // time complexity: O(n*m) naive - replace mean_nn_dist with octree for O(n log n)
-ChamferResult chamfer_distance(const vector<Point>& A, const vector<Point>& B) {
+ChamferResult chamfer_distance(const std::vector<Point>& A, const std::vector<Point>& B) {
     ChamferResult result;
     result.mean_ab = mean_nn_dist(A,B);
     result.mean_ba = mean_nn_dist(B,A);
@@ -72,22 +71,25 @@ ChamferResult chamfer_distance(const vector<Point>& A, const vector<Point>& B) {
 
 // a named point cloud - maps to one semantic part of 3D model
 struct PartCloud {
-    string canonical_path;
-    vector<Point> points;
+    std::string canonical_path;
+    std::vector<Point> points;
 };
 
 // per part chamfer distance
 // computes CD per semantiic part, not just the whole mesh
 // similar to evaluating per-block generation quality
 struct PartChamferResult {
-    string canonical_path;
+    std::string canonical_path;
     ChamferResult cd_result;
     // if part is not found in generated output
     bool missing;
 };
 
-vector<PartChamferResult> per_part_chamfer(const vector<PartCloud>& gt_parts, const vector<PartCloud>& gen_parts) {
-    vector<PartChamferResult> results;
+std::vector<PartChamferResult> per_part_chamfer(
+    const std::vector<PartCloud>& gt_parts,
+    const std::vector<PartCloud>& gen_parts
+) {
+    std::vector<PartChamferResult> results;
 
     for(const auto& gt : gt_parts) {
         PartChamferResult r;
@@ -106,20 +108,20 @@ vector<PartChamferResult> per_part_chamfer(const vector<PartCloud>& gt_parts, co
     return results;
 }
 
-void print_part_results(const vector<PartChamferResult>& results) {
-    cout << "\n--- Per-Part Chamfer Distance (x10^-3) ---\n";
-    cout << string(64, '-') << "\n";
+void print_part_results(const std::vector<PartChamferResult>& results) {
+    std::cout << "\n--- Per-Part Chamfer Distance (x10^-3) ---\n";
+    std::cout << std::string(64, '-') << "\n";
 
     float total_cd = 0.0f;
     int evaluated = 0;
 
     for(const auto& r : results) {
         if(r.missing) {
-            cout << r.canonical_path << ": MISSING\n";
+            std::cout << r.canonical_path << ": MISSING\n";
             continue;
         }
 
-        cout << r.canonical_path 
+        std::cout << r.canonical_path 
                 << " | CD=" << r.cd_result.cd_x1000
                 << " | A->B=" << r.cd_result.mean_ab * 1000.0f
                 << " | B->A=" << r.cd_result.mean_ba * 1000.0f << "\n";
@@ -128,9 +130,9 @@ void print_part_results(const vector<PartChamferResult>& results) {
         evaluated++;
     }
 
-    cout << string(64, '-') << "\n";
+    std::cout << std::string(64, '-') << "\n";
     if(evaluated > 0) {
-        cout << "Mean CD across parts: " << (total_cd / evaluated) * 1000.0f << " x10^-3\n";
+        std::cout << "Mean CD across parts: " << (total_cd / evaluated) * 1000.0f << " x10^-3\n";
     }
 }
 
@@ -140,11 +142,11 @@ void print_part_results(const vector<PartChamferResult>& results) {
 // (surface area on sphere) dA = sin(ϕ) dϕ dθ
 // the normal distibution is the only distribution where sampling each axis independently
 // gives spherical symmetry, it has no directional bias - it's equally likely to point anywhere in 3D space
-vector<Point> sample_sphere(int n_points, float radius = 1.0f, unsigned int seed = 42) {
-    vector<Point> cloud;
-    mt19937 rng(seed);
+std::vector<Point> sample_sphere(int n_points, float radius = 1.0f, unsigned int seed = 42) {
+    std::vector<Point> cloud;
+    std::mt19937 rng(seed);
     // 68% of values fall within -1.0 to 1.0
-    normal_distribution<float> dist(0.0f, 1.0f);
+    std::normal_distribution<float> dist(0.0f, 1.0f);
 
     for (int i = 0; i < n_points; i++)
     {
@@ -154,7 +156,7 @@ vector<Point> sample_sphere(int n_points, float radius = 1.0f, unsigned int seed
         float z = dist(rng);
 
         // compute magnitude
-        float len = sqrt(x * x + y * y + z * z);
+        float len = std::sqrt(x * x + y * y + z * z);
 
         // normalize to unit sphere
         // now vector has length exactly 1.0
@@ -167,11 +169,11 @@ vector<Point> sample_sphere(int n_points, float radius = 1.0f, unsigned int seed
 
 // adding gaussian noise to spherical point cloud
 // after noise addition, points are nudged and length is changed and they are no longer on sphere surface
-vector<Point> add_noise(const vector<Point>& cloud, float sigma = 0.05f, unsigned int seed = 99) {
-    vector<Point> noisy_cloud = cloud;
-    mt19937 rng(seed);
+std::vector<Point> add_noise(const std::vector<Point>& cloud, float sigma = 0.05f, unsigned int seed = 99) {
+    std::vector<Point> noisy_cloud = cloud;
+    std::mt19937 rng(seed);
     // generates random values centered at 0 and spread between [-sigma, +sigma] and far away almost exponentially rare
-    normal_distribution<float> dist(0.0f, sigma);
+    std::normal_distribution<float> dist(0.0f, sigma);
     for(auto &p : noisy_cloud) {
         p.x += dist(rng);
         p.y += dist(rng);
