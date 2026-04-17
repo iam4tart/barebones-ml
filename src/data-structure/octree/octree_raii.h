@@ -368,9 +368,9 @@ void serialize(const OctreeNode* node, std::ostream& os) {
 }
 
 // reconstruct tree from stream
-void deserialize(OctreeNode* node, std::os) {
+void deserialize(OctreeNode* node, std::istream& is) {
     bool isLeaf;
-    os.read(reinterpret_cast<char*>(&isLeaf), sizeof(bool));
+    is.read(reinterpret_cast<char*>(&isLeaf), sizeof(bool));
 
     if(isLeaf) {
         size_t numPoints;
@@ -383,7 +383,7 @@ void deserialize(OctreeNode* node, std::os) {
     else {
         subdivide(node);
         for(int i=0; i<8; ++i) {
-            deserialize(node->children[i].get(), os);
+            deserialize(node->children[i].get(), is);
         }
     }
 }

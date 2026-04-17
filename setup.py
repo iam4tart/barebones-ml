@@ -16,6 +16,12 @@ setup(
                 'src/metric/chamfer-distance/torch_chamfer_distance.cpp',
             ],
         ),
+        CppExtension(
+            name='barebones.libs.fps',
+            sources=[
+                'src/algorithm/fps/torch_fps.cpp',
+            ],
+        ),
     ],
     cmdclass={
         'build_ext': BuildExtension

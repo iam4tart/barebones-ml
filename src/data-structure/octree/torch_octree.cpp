@@ -1,6 +1,8 @@
 #include <torch/torch.h>
 #include <torch/extension.h>
 #include <torch/script.h>
+#include <iostream>
+#include <ostream>
 
 #include "octree_raii.h"
 
