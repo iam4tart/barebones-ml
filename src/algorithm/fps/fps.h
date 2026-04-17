@@ -1,69 +1,62 @@
-//  farthest point sampling
-//  our usecase - select a subset of points that best represent the entire point cloud
-// basically selecting 5 balloons out of 10000 balloons which represents a room
-
-// random sampling may cluster points in one region
-// fps tends to spreads points uniformly accross space and produces better coverage of shape with less points
-
-// algorithm:
-// pick any starting point usually index 0
-// compute distance from every point to the selection set
-// pick the point with maximum distance - farthest from everything else
-// add it to selection, update distances
-// repeat until n sample points selected
-
-// dist[i] = min(dist[i], dist_to_new_added_point)
-// no need to compare distance against all selected points
-// because dist[i] already stores the min distance to all previous selections
-
 #pragma once
 
-#include <iostream>
 #include <vector>
 #include <limits>
 #include <random>
 #include <cassert>
+#include <cmath>
 
 struct Point {
     float x, y, z;
 };
 
-float sq_dist(const Point& a, const Point& b) {
+// no sqrt needed for comparisons
+// inline because it is called millions of times in the algorithm
+inline float sq_dist(const Point& a, const Point& b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     float dz = a.z - b.z;
-    return dx*dx + dy*dy + dz*dz;
+    return dx*dx+dy*dy+dz*dz;
 }
 
-
-// time complexity - O(n * k)
+// input point cloud, desired number of points to select, index of first point to start sampling
 std::vector<int> fps(const std::vector<Point>& cloud, int n_samples, int start_idx=0) {
     int N = static_cast<int>(cloud.size());
 
     assert(N>0);
-    assert(n_samples > 0 && n_samples <= N);
+    assert(n_samples>0 && n_samples<=N);
 
+    // maintains dist for every point in the cloud to determine which is farthest
+    // from exisiting selected set of points during the next iteration
     std::vector<float> dist(N, std::numeric_limits<float>::infinity());
-
+    // points picked so far
     std::vector<int> selected;
     selected.reserve(n_samples);
+
+    // random start if needed
+    if(start_idx < 0) {
+        std::mt19937 rng(42);
+        std::uniform_int_distribution<int> uni(0, N-1);
+        start_idx = uni(rng);
+    }
 
     selected.push_back(start_idx);
 
     for(int s=1; s<n_samples; s++) {
         int last = selected.back();
 
-        // if point i is closer to the last than to 
-        // any previous selection, update its min distance
+        // update step
         for(int i=0; i<N; i++) {
             float d = sq_dist(cloud[i], cloud[last]);
-            if(d < dist[i]) dist[i] = d;
+            if(d<dist[i]) dist[i] = d;
         }
 
-        // point with max distance to selection set
-        // this is the point least covered by current selection
+        // argmax
         int farthest = 0;
+        // distances are positives, it will be overwritten at any valid distance
+        // this ensures first point becomes the initial farthest candidate
         float max_d = -1.0f;
+
         for(int i=0; i<N; i++) {
             if(dist[i] > max_d) {
                 max_d = dist[i];
@@ -71,32 +64,65 @@ std::vector<int> fps(const std::vector<Point>& cloud, int n_samples, int start_i
             }
         }
 
-        // add back to selection the covered point
         selected.push_back(farthest);
     }
+
     return selected;
 }
 
-// return sampled points instead of indices
-std::vector<Point> fps_points(const std::vector<Point>& cloud, int n_samples, int start_idx=0) {
+// extract sampled points from indices
+inline std::vector<Point> fps_points(const std::vector<Point>& cloud, int n_samples, int start_idx=0) {
     auto indices = fps(cloud, n_samples, start_idx);
     std::vector<Point> result;
     result.reserve(n_samples);
+
     for(int idx : indices) result.push_back(cloud[idx]);
     return result;
 }
 
-// to compare fps vs random sampling quality
-float mean_coverage(const std::vector<Point>& sampled, std::vector<Point>& full) {
+// measure how well the samples represent the original shape
+// lower is better because sampled points are spread well
+// higher means larger gaps indicating failure in capturing the shape
+// less sensitive to outliers
+inline float mean_coverage(const std::vector<Point>& pts, const std::vector<int>& sampled_idx) {
+    // accumulate gap distance
     float total = 0.0f;
-    for(const auto& p : full) {
-        float best = std::numeric_limits<float>::infinity();
-        for(const auto& s : sampled) {
-            float d = sq_dist(p, s);
-            if(d<best) best = d;
-        }
-        total += std::sqrt(best);
 
-        return total/static_cast<float>(full.size());
+    for(int i=0; i<pts.size(); ++i) {
+        float best = std::numeric_limits<float>::infinity();
+
+        // get the best distance from sampled set
+        for(int j : sampled_idx) {
+            float d = sq_dist(pts[i], pts[j]);
+            if(d < best) best = d;
+        }
+
+        // actual euclidean distance
+        total += std::sqrt(best);
     }
+
+    // density of sampling
+    return total/pts.size();
+}
+
+// max coverage AKA hausdorff distance measures worst case scenario
+// identifies the largest gap means it finds signle most isolated point
+// in the original cloud that samples failed to get near
+// very sensitive to outliers
+inline float max_coverage(const std::vector<Point>& pts, const std::vector<int>& sampled_idx) {
+    float worst = 0.0f;
+
+    for(int i=0; i<pts.size(); ++i) {
+        float best = std::numeric_limits<float>::infinity();
+
+        for(int j : sampled_idx) {
+            float d = sq_dist(pts[i], pts[j]);
+            if(d < best) best = d;
+        }
+
+        // max filter
+        if(best > worst) worst = best;
+    }
+
+    return std::sqrt(worst);
 }

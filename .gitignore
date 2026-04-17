@@ -219,5 +219,6 @@ venv/
 *.exe
 
 datasets/
+3d-models/
 
 *.pth
