@@ -68,10 +68,10 @@ torch::Tensor chamfer_distance_op(const torch::Tensor& a, const torch::Tensor& b
     return out;
 }
 
-TORCH_LIBRARY(barebones, m) {
+TORCH_LIBRARY(barebones_chamfer, m) {
     m.def("chamfer_distance(Tensor a, Tensor b) -> Tensor");
 }
 
-TORCH_LIBRARY_IMPL(barebones, CPU, m) {
+TORCH_LIBRARY_IMPL(barebones_chamfer, CPU, m) {
     m.impl("chamfer_distance", chamfer_distance_op);
 }

@@ -1,5 +1,4 @@
 import torch
-from barebones.libs import fps as _fps
 
 def fps(pts: torch.Tensor, n_samples: int, start_idx: int = 0):
     """
