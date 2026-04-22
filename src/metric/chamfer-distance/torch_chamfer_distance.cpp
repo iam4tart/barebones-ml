@@ -68,10 +68,11 @@ torch::Tensor chamfer_distance_op(const torch::Tensor& a, const torch::Tensor& b
     return out;
 }
 
-TORCH_LIBRARY(barebones_chamfer, m) {
-    m.def("chamfer_distance(Tensor a, Tensor b) -> Tensor");
-}
-
-TORCH_LIBRARY_IMPL(barebones_chamfer, CPU, m) {
-    m.impl("chamfer_distance", chamfer_distance_op);
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.doc() = "chamfer distance — cpu";
+    m.def("chamfer_distance", &chamfer_distance_op,
+          "chamfer distance between two point clouds\n"
+          "args: a [n,3] float32, b [m,3] float32\n"
+          "returns: tensor [4] = [cd, mean_ab, mean_ba, cd_x1000]",
+          py::arg("a"), py::arg("b"));
 }

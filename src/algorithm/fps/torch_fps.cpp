@@ -74,14 +74,12 @@ double max_coverage_torch(torch::Tensor cloud, torch::Tensor sampled_idx) {
     return static_cast<double>(max_coverage(pts, idx));
 }
 
-TORCH_LIBRARY(barebones_fps, m) {
-    m.def("fps(Tensor cloud, int64_t n_samples, int64_t start_idx) -> (Tensor, Tensor)");
-    m.def("mean_coverage(Tensor cloud, Tensor idx) -> double");
-    m.def("max_coverage(Tensor cloud, Tensor idx) -> double");
-}
-
-TORCH_LIBRARY_IMPL(barebones_fps, CPU, m) {
-    m.impl("fps", fps_torch);
-    m.impl("mean_coverage", mean_coverage_torch);
-    m.impl("max_coverage", max_coverage_torch);
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.doc() = "farthest point sampling — cpu";
+    m.def("fps",           &fps_torch,           "fps(cloud, n_samples, start_idx) -> (indices, points)",
+          py::arg("cloud"), py::arg("n_samples"), py::arg("start_idx") = 0);
+    m.def("mean_coverage", &mean_coverage_torch, "mean coverage error",
+          py::arg("cloud"), py::arg("sampled_idx"));
+    m.def("max_coverage",  &max_coverage_torch,  "max coverage error",
+          py::arg("cloud"), py::arg("sampled_idx"));
 }

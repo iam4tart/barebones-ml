@@ -1,38 +1,56 @@
 import os
-import ctypes
-import torch
+import sys
+import importlib
+import importlib.util
+import importlib.machinery
 from pathlib import Path
 
-# 1. Locate the confirmed DLL directory
-torch_lib_dir = Path(torch.__file__).parent / "lib"
+try:
+    import torch as _torch_check
+    _torch_lib = Path(_torch_check.__file__).parent / "lib"
+    if _torch_lib.exists() and hasattr(os, "add_dll_directory"):
+        os.add_dll_directory(str(_torch_lib))
+except Exception:
+    pass
 
-if torch_lib_dir.exists():
-    # Convert to absolute string for Windows
-    dll_path = str(torch_lib_dir.resolve())
-    
-    # Add to search path
-    os.add_dll_directory(dll_path)
-    
-    # 2. FORCE PRELOAD (The "Manual Handshake")
-    # We load them in order of dependency: c10 first, then torch_cpu
+import torch
+
+_here     = Path(__file__).parent
+_libs_dir = _here / "libs"
+
+def _load_extension(mod_name: str):
+    short_name = mod_name.split(".")[-1]  
+
+    pyd_files = list(_libs_dir.glob(f"{short_name}*.pyd")) + \
+                list(_libs_dir.glob(f"{short_name}*.so"))
+
+    if not pyd_files:
+        raise ImportError(
+            f"cannot find compiled extension '{short_name}' in {_libs_dir}\n"
+            f"run: python setup.py build_ext --inplace"
+        )
+
+    _pyd = pyd_files[0]
+
+    _loader = importlib.machinery.ExtensionFileLoader(mod_name, str(_pyd))
+    _spec   = importlib.util.spec_from_file_location(
+        mod_name, str(_pyd),
+        loader=_loader,
+        submodule_search_locations=[]
+    )
+    _mod = importlib.util.module_from_spec(_spec)
+    sys.modules[mod_name] = _mod
+    _spec.loader.exec_module(_mod)
+    return _mod
+
+_ext_names = ["octree", "chamfer", "fps"]
+
+for _name in _ext_names:
     try:
-        ctypes.CDLL(os.path.join(dll_path, "c10.dll"))
-        ctypes.CDLL(os.path.join(dll_path, "torch_cpu.dll"))
-    except Exception as e:
-        print(f"Preload Warning: {e}")
+        _mod = _load_extension(f"barebones.libs.{_name}")
+        globals()[_name] = _mod
+    except ImportError as e:
+        import warnings
+        warnings.warn(f"barebones: could not load '{_name}': {e}")
 
-# 3. LOAD YOUR LIBRARIES
-libs_dir = Path(__file__).parent / "libs"
-for pyd in libs_dir.glob("*.pyd"):
-    try:
-        torch.ops.load_library(str(pyd.resolve()))
-    except Exception as e:
-        print(f"Final failure loading {pyd.name}: {e}")
-
-# 4. EXPORTS
-from .fps import fps, mean_coverage, max_coverage
-from .chamfer_distance import chamfer_distance
-from .octree import (
-    insert_points, query_range, nearest_neighbor, k_nearest_neighbor,
-    remove_point, subdivide, redistribute, redistribute_query, save, load
-)
+__all__ = _ext_names

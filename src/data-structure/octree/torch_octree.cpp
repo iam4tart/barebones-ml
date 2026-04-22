@@ -1,6 +1,6 @@
 #include <torch/torch.h>
 #include <torch/extension.h>
-#include <torch/script.h>
+// #include <torch/script.h>
 #include <iostream>
 #include <ostream>
 
@@ -97,15 +97,16 @@ void load_octree(std::string path) {
     deserialize(&root, is);
 }
 
-TORCH_LIBRARY(barebones_octree, m) {
-    m.def("insert_points(Tensor pts) -> ()", insert_points);
-    m.def("query_range(Tensor box) -> Tensor", query_range);
-    m.def("nearest_neighbor(Tensor query) -> Tensor", nearest_neighbor);
-    m.def("k_nearest_neighbor(Tensor query, int k) -> Tensor", k_nearest_neighbor);
-    m.def("remove_point(Tensor pt) -> bool", remove_point);
-    m.def("subdivide() -> ()", force_subdivide);
-    m.def("redistribute() -> ()", redistribute_root);
-    m.def("redistribute_query(Tensor query) -> bool", redistribute_query);
-    m.def("save_octree(str path) -> ()", save_octree);
-    m.def("load_octree(str path) -> ()", load_octree);
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.doc() = "octree — cpu";
+    m.def("insert_points",      &insert_points,      py::arg("pts"));
+    m.def("query_range",        &query_range,        py::arg("box"));
+    m.def("nearest_neighbor",   &nearest_neighbor,   py::arg("query"));
+    m.def("k_nearest_neighbor", &k_nearest_neighbor, py::arg("query"), py::arg("k"));
+    m.def("remove_point",       &remove_point,       py::arg("pt"));
+    m.def("subdivide",          &force_subdivide);
+    m.def("redistribute",       &redistribute_root);
+    m.def("redistribute_query", &redistribute_query, py::arg("query"));
+    m.def("save_octree",        &save_octree,        py::arg("path"));
+    m.def("load_octree",        &load_octree,        py::arg("path"));
 }

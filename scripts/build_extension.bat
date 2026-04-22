@@ -1,19 +1,16 @@
 @echo off
-REM clean previous build
-if exist build (
-    echo Removing old build folder...
-    rmdir /s /q build
-)
+echo cleaning previous build...
+rd /s /q build 2>nul
+del /q barebones\libs\*.pyd 2>nul
+del /q barebones\libs\*.so 2>nul
 
-REM compile and install the extension
-echo Building barebones extension...
+echo building extensions...
 python setup.py build_ext --inplace
 
-REM clean build folder again after successful build
-if exist build (
-    echo Cleaning build folder after build...
-    rmdir /s /q build
-)
+echo.
+echo verifying output in barebones\libs\:
+dir barebones\libs\*.pyd 2>nul || echo no .pyd files found - build may have failed
 
-echo Done! Run 'from barebones import octree' in Python.
-pause
+echo.
+echo testing import...
+python -c "import torch; import barebones; print('ok:', dir(barebones))"
