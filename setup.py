@@ -3,7 +3,6 @@ import shutil
 from setuptools import setup
 from torch.utils.cpp_extension import BuildExtension, CppExtension
 
-
 setup(
     name='barebones',
     packages=['barebones', 'barebones.libs'],
@@ -25,6 +24,12 @@ setup(
         CppExtension(
             name='barebones.libs.fps',
             sources=['src/algorithm/fps/torch_fps.cpp'],
+            extra_compile_args=['/W3', '/O2', '/EHsc'],
+            extra_link_args=['/OPT:REF'],
+        ),
+        CppExtension(
+            name='barebones.libs.ball_query',
+            sources=['src/algorithm/ball-query/torch_ball_query.cpp'],
             extra_compile_args=['/W3', '/O2', '/EHsc'],
             extra_link_args=['/OPT:REF'],
         ),
