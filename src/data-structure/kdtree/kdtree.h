@@ -67,6 +67,31 @@ bool exact_search(Node* root, Point query) {
     }
 }
 
-Node* remove(Node* root, Point q) {
+Node* findMin(Node* root, char lvl) {
+    if(root == nullptr) return nullptr;
+
+    Node* min = root;
+
+    if(root->level == lvl) {
+        if(root->left == nullptr) {
+            return root;
+        }
+        return findMin(root->left, lvl);
+    }
     
+    Node* leftMin = findMin(root->left, lvl);
+    Node* rightMin = findMin(root->right, lvl);
+
+    if(leftMin && leftMin->p.x < min->p.x) min = leftMin;
+    if(rightMin && rightMin->p.x < min->p.x) min = rightMin;
+
+    return min;
+}
+
+// EDIT: i have to add pruning because we can skip whole subtree
+
+
+Node* remove(Node* root, Point q) {
+
+    return root;
 }
